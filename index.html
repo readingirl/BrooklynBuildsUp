@@ -1,0 +1,364 @@
+<!-DOCTYPE html>
+<meta charset="utf-8">
+
+<style>
+
+body {
+	font: 15px sans-serif;
+	margin: 50px;
+}
+
+.axis path,
+.axis line {
+	fill: none;
+	stroke: #000;
+	shape-rendering: crispEdges;
+}
+
+.x.axis path {
+	display: none;
+}
+
+h1 {
+	font-size: 40px;
+	font-weight: bold;
+	}
+	
+h2 {
+	font-size: 25px;
+	font-weight: bold;
+	text-align: center;
+	}
+	
+p {
+	font-size: 20px;
+	}
+	
+.intro {
+width: 1200px;
+}
+.key {
+	padding: 10px;
+	width: 600px;
+	border: 2px solid #000000;
+	border-radius: 10px;
+	background-color: #d3d3d3;
+}
+
+.tooltip {
+	position: absolute;
+	z-index: 10;
+	border: 2px solid #000000;
+	border-radius: 10px;
+	width: 225px;
+	background-color: #d3d3d3;
+	font-family: sans-serif;
+	font-size: medium;
+	padding: 10px;
+	visibility: hidden;
+}
+
+
+</style>
+<script src="http://d3js.org/d3.v3.min.js"></script>
+<body>
+<h1>Brooklyn Builds Up</h1>
+<div class="intro">
+<p>There's the <a href="https://ny.curbed.com/2017/5/30/15712540/williamsburg-domino-sugar-325-kent-avenue-rental-launch">doughnut-shaped rental building</a> that's popped up on the South Williamsburg waterfront, at the site of the former Domino Sugar Factory. The Hub, currently Brooklyn's tallest building, <a href="https://ny.curbed.com/2016/10/13/13276248/brooklyn-tallest-building-affordable-apartments-for-rent">sprouted up</a> in Downtown Brooklyn (and contains some affordable housing units). A slew of new apartment buildings now populate Prospect Lefferts garden, the neighborhood bordering Prospect Park that only recently became a <a href="http://nypost.com/2017/01/19/the-last-affordable-brooklyn-neighborhood-with-park-views/">rental destination</a>. And rumor has it, Amazon's second U.S. headquarters is likely to join the <a href="https://www.bloomberg.com/news/articles/2017-09-19/brooklyn-seen-as-best-bet-for-nyc-to-win-new-amazon-headquarters">7 million square feet of offices</a> coming to Brooklyn.</p>
+<p>Brooklyn's building boom is in full swing, bringing new housing, along with retail and office space, to the borough while causing consternation for residents whose neighborhoods are changing before their eyes. And for members of these communities old and new, it means the near-constant presence of noise, dust and scaffolding.</p>
+
+<p>The chart below explores what's in the works for Brooklyn, organized by its 18 <a href="http://www.baruch.cuny.edu/nycdata/population-geography/maps_files/brooklyn.png">Community Board districts</a> (hover over each to see the neighborhoods they cover). It depicts initial construction permits issued by the Department of Buildings from January through September 2017. Perhaps unsurprisingly, the districts containing Williamsburg, Brooklyn Heights and Bushwick are gearing up for even more construction. (And it would appear that Northern Brooklyn is clearing the most space in order to do so.) But as the chart shows, neighborhoods deeper in Brooklyn, like Boro Park and Sheepshead Bay, are clearing out the old and building up the new as well.  </p>
+<p><a href="https://data.cityofnewyork.us/Housing-Development/DOB-Permit-Issuance/ipu4-2q9a">Source: NYC Open Data</a></p>
+</div>
+<div class="key">
+<h2>Major Permits Issued</h2>
+<p>NB: Construction of new structures</p>
+<p>A1: Major alterations that will change use, egress or occupancy</p>
+<p>DM: Demolition & Removal</p>
+</div>
+<script>
+//determines svg size
+var margin = {top: 20, right: 20, bottom: 30, left: 55},
+	width = 1500 - margin.left - margin.right,
+	height = 500 - margin.top - margin.bottom;
+	
+//sets and spaces each community board group	
+var x0 = d3.scale.ordinal()
+	.rangeRoundBands([0, width], .1);
+
+//sets each permit type within the cb group
+var x1 = d3.scale.ordinal();
+
+var y = d3.scale.linear()
+	.range([height, 0]);
+
+//sets color for each permit type	
+var color = d3.scale.ordinal()
+	.range(["#fc7500", "#ffa500", "#f22c04" ]);
+
+//x-axis function, with big grouping based on cbs	
+var xAxis = d3.svg.axis()
+	.scale(x0)
+	.orient("bottom");
+
+
+var yAxis = d3.svg.axis()
+	.scale(y)
+	.orient("left");
+
+var svg = d3.select("body").append("svg")
+	.attr("width", width + margin.left + margin.right)
+	.attr("height", height + margin.top + margin.bottom)
+	.append ("g")
+	.attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+	
+d3.csv("data.csv", function(error, data) {
+	var permitNames = d3.keys(data[0]).filter(function(key) {return key !== "CB"; });
+
+//generating key-value pairs
+	data.forEach(function(d) {
+		d.permits = permitNames.map(function(name) {return {name: name, value: +d[name]}; });
+	});
+
+//setting domain and range
+	x0.domain(data.map(function(d) { return d.CB; }));
+	//range keeps data grouped together
+	x1.domain(permitNames).rangeRoundBands([0, x0.rangeBand()]);
+	y.domain([0, d3.max(data, function(d) { return d3.max(d.permits, function(d) {return d.value; }); })]);
+
+//creates x axis
+	svg.append("g")
+		.attr("class", "x axis")
+		.attr("transform", "translate(0," + height + ")")
+		.call(xAxis);
+//creates y axis
+	svg.append("g")
+		.attr("class", "y axis")
+		.call(yAxis)
+		.append("text")
+		.attr("transform", "rotate(-90)")
+		.attr("y", -55)
+		.attr("dy", ".71em")
+		.style("text-anchor", "end")
+		.text("Permits Issued, Jan-Sep 2017");
+	
+	var cb = svg.selectAll(".cb")
+		.data(data)
+		.enter().append("g")
+		.attr("class", "g")
+		.attr("id", function(d,i){ return "g" + i})
+		.attr("transform", function(d) {return "translate(" + x0(d.CB) + ",0)"; });
+
+	cb.selectAll("rect")
+		.data(function(d) { return d.permits; })
+		.enter().append("rect")
+		.attr("width", x1.rangeBand())
+		.attr("x", function(d) { return x1(d.name); })
+		.attr("y", function(d) {return y(d.value); })
+		.attr("height", function(d) { return height - y(d.value); })
+		.style("fill", function(d) {return color(d.name); });
+		
+	var legend = svg.selectAll(".legend")
+		.data(permitNames.slice())
+		.enter().append("g")
+		.attr("class", "legend")
+		.attr("transform", function(d, i) {return "translate(0," + i * 25 + ")"; });
+		
+	legend.append("rect")
+		.attr("x", width - 23)
+		.attr("width", 23)
+		.attr("height", 23)
+		.style("fill", color);
+		
+	legend.append("text")
+		.attr("x", width - 29)
+		.attr("y", 12)
+		.attr("dy", ".35em")
+		.style("text-anchor", "end")
+		.text(function(d) { return d; });
+	
+	var tooltip301 = d3.select("body")
+	.append("div")
+	.attr("class", "tooltip")
+	.text("Flushing Avenue, Williamsburg, Greenpoint, Northside, and Southside");
+
+	d3.select("#g0")
+    .on("mouseover", function(){return tooltip301.style("visibility", "visible");})
+	.on("mousemove", function(){return tooltip301.style("top", (d3.event.pageY-10)+"px").style("left",(d3.event.pageX+10)+"px");})
+	.on("mouseout", function(){return tooltip301.style("visibility", "hidden");});
+
+	var tooltip302 = d3.select("body")
+	.append("div")
+	.attr("class", "tooltip")
+	.text("Brooklyn Heights, Fulton Mall, Boerum Hill, Fort Greene, Brooklyn Navy Yard, Fulton Ferry, and Clinton Hill");
+
+	d3.select("#g1")
+    .on("mouseover", function(){return tooltip302.style("visibility", "visible");})
+	.on("mousemove", function(){return tooltip302.style("top", (d3.event.pageY-10)+"px").style("left",(d3.event.pageX+10)+"px");})
+	.on("mouseout", function(){return tooltip302.style("visibility", "hidden");});
+	
+	var tooltip303 = d3.select("body")
+	.append("div")
+	.attr("class", "tooltip")
+	.text("Bedford-Stuyvesant, Stuyvesant Heights, and Ocean Hill");
+
+	d3.select("#g2")
+    .on("mouseover", function(){return tooltip303.style("visibility", "visible");})
+	.on("mousemove", function(){return tooltip303.style("top", (d3.event.pageY-10)+"px").style("left",(d3.event.pageX+10)+"px");})
+	.on("mouseout", function(){return tooltip303.style("visibility", "hidden");});
+
+
+	var tooltip304 = d3.select("body")
+	.append("div")
+	.attr("class", "tooltip")
+	.text("Bushwick");
+
+	d3.select("#g3")
+    .on("mouseover", function(){return tooltip304.style("visibility", "visible");})
+	.on("mousemove", function(){return tooltip304.style("top", (d3.event.pageY-10)+"px").style("left",(d3.event.pageX+10)+"px");})
+	.on("mouseout", function(){return tooltip304.style("visibility", "hidden");});
+
+
+	var tooltip305 = d3.select("body")
+	.append("div")
+	.attr("class", "tooltip")
+	.text("East New York, Cypress Hills, Highland Park, New Lots, City Line, Starrett City, and Ridgewood");
+
+	d3.select("#g4")
+    .on("mouseover", function(){return tooltip305.style("visibility", "visible");})
+	.on("mousemove", function(){return tooltip305.style("top", (d3.event.pageY-10)+"px").style("left",(d3.event.pageX+10)+"px");})
+	.on("mouseout", function(){return tooltip305.style("visibility", "hidden");});
+	
+	var tooltip306 = d3.select("body")
+	.append("div")
+	.attr("class", "tooltip")
+	.text("Red Hook, Carroll Gardens, Park Slope, Gowanus, and Cobble Hill");
+
+	d3.select("#g5")
+    .on("mouseover", function(){return tooltip306.style("visibility", "visible");})
+	.on("mousemove", function(){return tooltip306.style("top", (d3.event.pageY-10)+"px").style("left",(d3.event.pageX+10)+"px");})
+	.on("mouseout", function(){return tooltip306.style("visibility", "hidden");});
+	
+	var tooltip307 = d3.select("body")
+	.append("div")
+	.attr("class", "tooltip")
+	.text("Sunset Park and Windsor Terrace");
+
+	d3.select("#g6")
+    .on("mouseover", function(){return tooltip307.style("visibility", "visible");})
+	.on("mousemove", function(){return tooltip307.style("top", (d3.event.pageY-10)+"px").style("left",(d3.event.pageX+10)+"px");})
+	.on("mouseout", function(){return tooltip307.style("visibility", "hidden");});
+	
+	var tooltip308 = d3.select("body")
+	.append("div")
+	.attr("class", "tooltip")
+	.text("Crown Heights, Prospect Heights, and Weeksville");
+
+	d3.select("#g7")
+    .on("mouseover", function(){return tooltip308.style("visibility", "visible");})
+	.on("mousemove", function(){return tooltip308.style("top", (d3.event.pageY-10)+"px").style("left",(d3.event.pageX+10)+"px");})
+	.on("mouseout", function(){return tooltip308.style("visibility", "hidden");});
+	
+	var tooltip309 = d3.select("body")
+	.append("div")
+	.attr("class", "tooltip")
+	.text("Crown Heights, Prospect Lefferts Gardens, and Wingate");
+
+	d3.select("#g8")
+    .on("mouseover", function(){return tooltip309.style("visibility", "visible");})
+	.on("mousemove", function(){return tooltip309.style("top", (d3.event.pageY-10)+"px").style("left",(d3.event.pageX+10)+"px");})
+	.on("mouseout", function(){return tooltip309.style("visibility", "hidden");});
+	
+	var tooltip310 = d3.select("body")
+	.append("div")
+	.attr("class", "tooltip")
+	.text("Bay Ridge, Dyker Heights, and Fort Hamilton");
+
+	d3.select("#g9")
+    .on("mouseover", function(){return tooltip310.style("visibility", "visible");})
+	.on("mousemove", function(){return tooltip310.style("top", (d3.event.pageY-10)+"px").style("left",(d3.event.pageX+10)+"px");})
+	.on("mouseout", function(){return tooltip310.style("visibility", "hidden");});
+	
+	var tooltip311 = d3.select("body")
+	.append("div")
+	.attr("class", "tooltip")
+	.text("Bath Beach, Gravesend, Mapleton, and Bensonhurst");
+
+	d3.select("#g10")
+    .on("mouseover", function(){return tooltip311.style("visibility", "visible");})
+	.on("mousemove", function(){return tooltip311.style("top", (d3.event.pageY-10)+"px").style("left",(d3.event.pageX+10)+"px");})
+	.on("mouseout", function(){return tooltip311.style("visibility", "hidden");});
+	
+	var tooltip312 = d3.select("body")
+	.append("div")
+	.attr("class", "tooltip")
+	.text("Boro Park, Kensington, Ocean Parkway, and Midwood");
+
+	d3.select("#g11")
+    .on("mouseover", function(){return tooltip312.style("visibility", "visible");})
+	.on("mousemove", function(){return tooltip312.style("top", (d3.event.pageY-10)+"px").style("left",(d3.event.pageX+10)+"px");})
+	.on("mouseout", function(){return tooltip312.style("visibility", "hidden");});
+	
+	var tooltip313 = d3.select("body")
+	.append("div")
+	.attr("class", "tooltip")
+	.text("Coney Island, Brighton Beach, Bensonhurst, Gravesend, and Seagate");
+
+	d3.select("#g12")
+    .on("mouseover", function(){return tooltip313.style("visibility", "visible");})
+	.on("mousemove", function(){return tooltip313.style("top", (d3.event.pageY-10)+"px").style("left",(d3.event.pageX+10)+"px");})
+	.on("mouseout", function(){return tooltip313.style("visibility", "hidden");});
+	
+	var tooltip314 = d3.select("body")
+	.append("div")
+	.attr("class", "tooltip")
+	.text("Flatbush, Midwood, Kensington, and Ocean Parkway");
+
+	d3.select("#g13")
+    .on("mouseover", function(){return tooltip314.style("visibility", "visible");})
+	.on("mousemove", function(){return tooltip314.style("top", (d3.event.pageY-10)+"px").style("left",(d3.event.pageX+10)+"px");})
+	.on("mouseout", function(){return tooltip314.style("visibility", "hidden");});
+	
+	var tooltip315 = d3.select("body")
+	.append("div")
+	.attr("class", "tooltip")
+	.text("Sheepshead Bay, Manhattan Beach, Kings Bay, Gerritsen Beach, Kings Highway, East Gravesend, Madison, Homecrest, and Plum Beach");
+
+	d3.select("#g14")
+    .on("mouseover", function(){return tooltip315.style("visibility", "visible");})
+	.on("mousemove", function(){return tooltip315.style("top", (d3.event.pageY-10)+"px").style("left",(d3.event.pageX+10)+"px");})
+	.on("mouseout", function(){return tooltip315.style("visibility", "hidden");});
+	
+	var tooltip316 = d3.select("body")
+	.append("div")
+	.attr("class", "tooltip")
+	.text("Brownsville and Ocean Hill");
+
+	d3.select("#g15")
+    .on("mouseover", function(){return tooltip316.style("visibility", "visible");})
+	.on("mousemove", function(){return tooltip316.style("top", (d3.event.pageY-10)+"px").style("left",(d3.event.pageX+10)+"px");})
+	.on("mouseout", function(){return tooltip316.style("visibility", "hidden");});
+	
+	var tooltip317 = d3.select("body")
+	.append("div")
+	.attr("class", "tooltip")
+	.text("East Flatbush, Remsen Village, Farragut, Rugby, Erasmus and Ditmas Village");
+
+	d3.select("#g16")
+    .on("mouseover", function(){return tooltip317.style("visibility", "visible");})
+	.on("mousemove", function(){return tooltip317.style("top", (d3.event.pageY-10)+"px").style("left",(d3.event.pageX+10)+"px");})
+	.on("mouseout", function(){return tooltip317.style("visibility", "hidden");});
+	
+	var tooltip318 = d3.select("body")
+	.append("div")
+	.attr("class", "tooltip")
+	.text("Canarsie, Bergen Beach, Mill Basin, Flatlands, Marine Park, Georgetown, and Mill Island");
+
+	d3.select("#g17")
+    .on("mouseover", function(){return tooltip318.style("visibility", "visible");})
+	.on("mousemove", function(){return tooltip318.style("top", (d3.event.pageY-10)+"px").style("left",(d3.event.pageX+10)+"px");})
+	.on("mouseout", function(){return tooltip318.style("visibility", "hidden");});
+});
+</script>
+<p style="font-size: 10px">Data Visualization by <a href="https://lindsaydoesdataviz.wordpress.com/">Lindsay Abrams</a></p>
+</body>
